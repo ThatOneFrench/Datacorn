@@ -1,94 +1,121 @@
 name: macOS-build
 on: push
+
 jobs:
   macos-qt5:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-    - name: Install dependencies
-      run: |
-        brew update
-        brew install qt@5
-        echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
-    - name: Qmake build
-      run: |
-        mkdir build && cd build
-        qmake -o Makefile ../Datacorn.pro
-        make release -j3
-    - name: Setup directory with artifacts
-      shell: bash
-      run: |
-        export RDIR=Datacorn
-        mkdir $RDIR
-        cp -r build/binary/Datacorn.app $RDIR/
-        # Create a disk image for macOS
-        hdiutil create -volname "Datacorn" -srcfolder $RDIR -ov -format UDZO Datacorn.dmg
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Datacorn-macos
-        path: Datacorn/
-    - name: Upload DMG
-      uses: actions/upload-artifact@v4
-      with:
-        name: Datacorn-macos-dmg
-        path: Datacorn.dmg
-    - name: Release
-      if: ${{ github.ref == 'refs/heads/master' }}
-      uses: svenstaro/upload-release-action@2.7.0
-      with:
-        overwrite: true
-        asset_name: datacorn-macos.dmg
-        prerelease: true
-        tag: |
-          latest
-        file: |
-          Datacorn.dmg
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install qt@5
+          echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+
+      - name: Qmake build
+        run: |
+          mkdir build && cd build
+          qmake -o Makefile ../Datacorn.pro
+          make release -j3
+
+      - name: Bundle Qt5 frameworks into the app
+        run: |
+          macdeployqt build/binary/Datacorn.app
+
+      - name: Setup directory with artifacts
+        shell: bash
+        run: |
+          export RDIR=Datacorn
+          mkdir $RDIR
+          cp -R build/binary/Datacorn.app $RDIR/
+          # Tạo disk image cho macOS
+          hdiutil create \
+            -volname "Datacorn" \
+            -srcfolder $RDIR \
+            -ov \
+            -format UDZO \
+            Datacorn.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Datacorn-macos
+          path: Datacorn/
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Datacorn-macos-dmg
+          path: Datacorn.dmg
+
+      - name: Release
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: svenstaro/upload-release-action@2.7.0
+        with:
+          overwrite: true
+          asset_name: datacorn-macos.dmg
+          prerelease: true
+          tag: |
+            latest
+          file: |
+            Datacorn.dmg
 
   macos-qt6:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-    - name: Install dependencies
-      run: |
-        brew update
-        brew install qt@6
-        echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
-    - name: Qmake build
-      run: |
-        mkdir build && cd build
-        qmake6 -o Makefile ../Datacorn.pro
-        make release -j3
-    - name: Setup directory with artifacts
-      shell: bash
-      run: |
-        export RDIR=Datacorn
-        mkdir $RDIR
-        cp -r build/binary/Datacorn.app $RDIR/
-        # Create a disk image for macOS
-        hdiutil create -volname "Datacorn-Qt6" -srcfolder $RDIR -ov -format UDZO Datacorn-qt6.dmg
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Datacorn-macos-qt6
-        path: Datacorn/
-    - name: Upload DMG
-      uses: actions/upload-artifact@v4
-      with:
-        name: Datacorn-macos-qt6-dmg
-        path: Datacorn-qt6.dmg
-    - name: Release
-      if: ${{ github.ref == 'refs/heads/master' }}
-      uses: svenstaro/upload-release-action@v2
-      with:
-        overwrite: true
-        asset_name: datacorn-macos-qt6.dmg
-        prerelease: true
-        tag: |
-          latest
-        file: |
-          Datacorn-qt6.dmg
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install qt@6
+          echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
+
+      - name: Qmake build
+        run: |
+          mkdir build && cd build
+          qmake6 -o Makefile ../Datacorn.pro
+          make release -j3
+
+      - name: Bundle Qt6 frameworks into the app
+        run: |
+          macdeployqt build/binary/Datacorn.app
+
+      - name: Setup directory with artifacts
+        shell: bash
+        run: |
+          export RDIR=Datacorn
+          mkdir $RDIR
+          cp -R build/binary/Datacorn.app $RDIR/
+          # Tạo disk image cho macOS
+          hdiutil create \
+            -volname "Datacorn-Qt6" \
+            -srcfolder $RDIR \
+            -ov \
+            -format UDZO \
+            Datacorn-qt6.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Datacorn-macos-qt6
+          path: Datacorn/
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Datacorn-macos-qt6-dmg
+          path: Datacorn-qt6.dmg
+
+      - name: Release
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          overwrite: true
+          asset_name: datacorn-macos-qt6.dmg
+          prerelease: true

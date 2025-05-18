@@ -22,7 +22,7 @@ jobs:
       run: |
         export RDIR=Datacorn
         mkdir $RDIR
-        cp build/binary/Datacorn.app $RDIR/ -r
+        cp build/binary/Datacorn.app $RDIR/
         # Create a disk image for macOS
         hdiutil create -volname "Datacorn" -srcfolder $RDIR -ov -format UDZO Datacorn.dmg
     - name: Upload artifacts
@@ -68,7 +68,7 @@ jobs:
       run: |
         export RDIR=Datacorn
         mkdir $RDIR
-        cp build/binary/Datacorn.app $RDIR/ -r
+        cp build/binary/Datacorn.app $RDIR/
         # Create a disk image for macOS
         hdiutil create -volname "Datacorn-Qt6" -srcfolder $RDIR -ov -format UDZO Datacorn-qt6.dmg
     - name: Upload artifacts

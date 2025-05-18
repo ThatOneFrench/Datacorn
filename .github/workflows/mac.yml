@@ -26,12 +26,12 @@ jobs:
         # Create a disk image for macOS
         hdiutil create -volname "Datacorn" -srcfolder $RDIR -ov -format UDZO Datacorn.dmg
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Datacorn-macos
         path: Datacorn/
     - name: Upload DMG
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Datacorn-macos-dmg
         path: Datacorn.dmg
@@ -72,12 +72,12 @@ jobs:
         # Create a disk image for macOS
         hdiutil create -volname "Datacorn-Qt6" -srcfolder $RDIR -ov -format UDZO Datacorn-qt6.dmg
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Datacorn-macos-qt6
         path: Datacorn/
     - name: Upload DMG
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Datacorn-macos-qt6-dmg
         path: Datacorn-qt6.dmg

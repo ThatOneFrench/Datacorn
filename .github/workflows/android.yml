@@ -8,28 +8,54 @@ jobs:
       with:
         fetch-depth: 1
     
+    - name: Install Qt dependency packages
+      run: |
+        sudo apt-get update
+        sudo apt-get --no-install-recommends --yes install \
+          build-essential \
+          g++ \
+          cmake \
+          ninja-build \
+          libgl1-mesa-dev \
+          libxkbcommon-dev \
+          libxkbcommon-x11-dev
+    
     - name: Set up JDK
       uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
         java-version: '11'
     
-    - name: Set up Qt
+    - name: Install Android SDK command line tools
+      run: |
+        mkdir -p ${ANDROID_HOME}/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip -q commandlinetools-linux-9477386_latest.zip -d ${ANDROID_HOME}/cmdline-tools
+        mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
+        rm commandlinetools-linux-9477386_latest.zip
+        echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
+    
+    - name: Install Android SDK and NDK
+      run: |
+        ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.1.8937393"
+        echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/25.1.8937393" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/25.1.8937393" >> $GITHUB_ENV
+        
+    - name: Setup Qt
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.5.0'
-        target: 'android'
-        arch: 'android_armv7'
-        tools: 'tools_androiddeployqt,tools_qtcreator'
-        modules: 'qtcore qtgui qtwidgets'
+        host: 'linux'
+        target: 'desktop'
+        arch: 'gcc_64'
     
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
-      with:
-        sdk-platform: '33'
-        ndk-version: '25.1.8937393'
-        build-tools-version: '33.0.0'
-    
+    - name: Install QtForAndroid
+      run: |
+        pip install aqt
+        aqt install-qt linux android 6.5.0 android_armv7
+        export QT_ANDROID=${QT_ROOT}/6.5.0/android_armv7
+        echo "QT_ANDROID=${QT_ROOT}/6.5.0/android_armv7" >> $GITHUB_ENV
+        
     - name: Generate keystore
       run: |
         mkdir -p android-build
@@ -91,29 +117,66 @@ jobs:
         EOL
         fi
     
+    - name: Debug Qt environment
+      run: |
+        echo "Qt location: $Qt6_DIR"
+        echo "Android Qt location: $QT_ANDROID"
+        ls -la $Qt6_DIR/bin
+        ls -la $QT_ANDROID/bin || echo "QT_ANDROID bin directory not found"
+    
     - name: Build for Android
       run: |
         mkdir -p build-android && cd build-android
-        qmake CONFIG+=release PREFIX=/usr ../Datacorn.pro
+        
+        # Use either Qt6_DIR/bin/qmake or the direct path based on QT_ROOT
+        QMAKE_PATH="$Qt6_DIR/bin/qmake"
+        if [ ! -f "$QMAKE_PATH" ]; then
+          QMAKE_PATH="$QT_ROOT/6.5.0/android_armv7/bin/qmake"
+        fi
+        
+        echo "Using qmake at: $QMAKE_PATH"
+        $QMAKE_PATH PREFIX=/usr ../Datacorn.pro \
+          "CONFIG+=release" \
+          "CONFIG+=qtquickcompiler"
+          
         make -j$(nproc)
+        
+        # Create APK
         make INSTALL_ROOT=android-build install
-        # Deploy Qt libraries into APK package
-        androiddeployqt --input android-libDatacorn.so-deployment-settings.json \
-                        --output android-build \
-                        --android-platform android-33 \
-                        --jdk $JAVA_HOME \
-                        --gradle \
-                        --release \
-                        --sign ./android-release-key.keystore alias_name \
-                        --storepass password \
-                        --keypass password
+        
+        # Find androiddeployqt
+        ANDROIDDEPLOYQT_PATH="$Qt6_DIR/bin/androiddeployqt"
+        if [ ! -f "$ANDROIDDEPLOYQT_PATH" ]; then
+          ANDROIDDEPLOYQT_PATH="$QT_ROOT/6.5.0/android_armv7/bin/androiddeployqt"
+        fi
+        
+        echo "Using androiddeployqt at: $ANDROIDDEPLOYQT_PATH"
+        $ANDROIDDEPLOYQT_PATH \
+          --input android-libDatacorn.so-deployment-settings.json \
+          --output android-build \
+          --android-platform android-33 \
+          --jdk $JAVA_HOME \
+          --gradle \
+          --release \
+          --sign ../android-build/android-release-key.keystore alias_name \
+          --storepass password \
+          --keypass password
     
     - name: Setup directory with artifacts
       shell: bash
       run: |
         export RDIR=Datacorn-Android
         mkdir -p $RDIR
-        cp build-android/android-build/build/outputs/apk/release/android-build-release-signed.apk $RDIR/Datacorn.apk
+        
+        # Find the APK in different possible locations
+        if [ -f "build-android/android-build/build/outputs/apk/release/android-build-release-signed.apk" ]; then
+          cp build-android/android-build/build/outputs/apk/release/android-build-release-signed.apk $RDIR/Datacorn.apk
+        elif [ -f "build-android/android-build/build/outputs/apk/debug/android-build-debug.apk" ]; then
+          cp build-android/android-build/build/outputs/apk/debug/android-build-debug.apk $RDIR/Datacorn.apk
+        else
+          echo "APK not found. Searching for it..."
+          find build-android/ -name "*.apk" -exec cp {} $RDIR/Datacorn.apk \;
+        fi
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

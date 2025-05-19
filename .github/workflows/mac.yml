@@ -11,14 +11,17 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew update
-          arch -x86_64 brew install qt@5
-          echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+          if [ ! -d "/usr/local/Homebrew" ]; then
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+          fi
+          arch -x86_64 /usr/local/bin/brew update
+          arch -x86_64 /usr/local/bin/brew install qt@5
+          echo "/usr/local/opt/qt@5/bin" >> $GITHUB_PATH
 
       - name: Qmake build
         run: |
           mkdir build && cd build
-          arch -x86_64 /usr/bin/env QMAKE_APPLE_DEVICE_ARCHS=x86_64 qmake -o Makefile "CONFIG+=x86_64" ../Datacorn.pro
+          arch -x86_64 /usr/bin/env QMAKE_APPLE_DEVICE_ARCHS=x86_64 /usr/local/opt/qt@5/bin/qmake -o Makefile "CONFIG+=x86_64" ../Datacorn.pro
           arch -x86_64 make release -j3
 
       - name: Bundle Qt5 frameworks into the app

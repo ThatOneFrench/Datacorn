@@ -1,0 +1,134 @@
+name: android
+on: push
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+    
+    - name: Set up Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        target: 'android'
+        arch: 'android_armv7'
+        tools: 'tools_androiddeployqt,tools_qtcreator'
+        modules: 'qtcore qtgui qtwidgets'
+    
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+      with:
+        sdk-platform: '33'
+        ndk-version: '25.1.8937393'
+        build-tools-version: '33.0.0'
+    
+    - name: Generate keystore
+      run: |
+        mkdir -p android-build
+        keytool -genkey -v -keystore android-build/android-release-key.keystore \
+        -alias alias_name -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=Datacorn, OU=Organization, O=Company, L=City, S=State, C=Country" \
+        -storepass password -keypass password
+    
+    - name: Create AndroidManifest.xml if not exists
+      run: |
+        if [ ! -f "android/AndroidManifest.xml" ]; then
+          mkdir -p android
+          cat > android/AndroidManifest.xml << EOL
+        <?xml version="1.0"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android" 
+                  package="com.example.datacorn" 
+                  android:versionName="1.0" 
+                  android:versionCode="1" 
+                  android:installLocation="auto">
+            <application android:name="org.qtproject.qt.android.bindings.QtApplication" 
+                         android:label="Datacorn" 
+                         android:icon="@drawable/icon">
+                <activity android:name="org.qtproject.qt.android.bindings.QtActivity" 
+                          android:label="Datacorn" 
+                          android:screenOrientation="unspecified" 
+                          android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
+                          android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN"/>
+                        <category android:name="android.intent.category.LAUNCHER"/>
+                    </intent-filter>
+                    <meta-data android:name="android.app.lib_name" android:value="Datacorn"/>
+                    <meta-data android:name="android.app.arguments" android:value=""/>
+                    <meta-data android:name="android.app.extract_android_style" android:value="minimal"/>
+                </activity>
+            </application>
+            <supports-screens android:largeScreens="true" 
+                              android:normalScreens="true" 
+                              android:anyDensity="true" 
+                              android:smallScreens="true"/>
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+        </manifest>
+        EOL
+        fi
+    
+    - name: Modify .pro file for Android
+      run: |
+        # Create Android-specific section in .pro file if it doesn't exist
+        if ! grep -q "android {" Datacorn.pro; then
+          cat >> Datacorn.pro << EOL
+        
+        android {
+            QT += androidextras
+            ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android
+            ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
+        }
+        EOL
+        fi
+    
+    - name: Build for Android
+      run: |
+        mkdir -p build-android && cd build-android
+        qmake CONFIG+=release PREFIX=/usr ../Datacorn.pro
+        make -j$(nproc)
+        make INSTALL_ROOT=android-build install
+        # Deploy Qt libraries into APK package
+        androiddeployqt --input android-libDatacorn.so-deployment-settings.json \
+                        --output android-build \
+                        --android-platform android-33 \
+                        --jdk $JAVA_HOME \
+                        --gradle \
+                        --release \
+                        --sign ./android-release-key.keystore alias_name \
+                        --storepass password \
+                        --keypass password
+    
+    - name: Setup directory with artifacts
+      shell: bash
+      run: |
+        export RDIR=Datacorn-Android
+        mkdir -p $RDIR
+        cp build-android/android-build/build/outputs/apk/release/android-build-release-signed.apk $RDIR/Datacorn.apk
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Datacorn-Android
+        path: Datacorn-Android/
+    
+    - name: Release
+      if: ${{ github.ref == 'refs/heads/master' }}
+      uses: svenstaro/upload-release-action@v2
+      with:
+        overwrite: true
+        asset_name: datacorn-android
+        prerelease: true
+        tag: |
+          latest
+        file: |
+          Datacorn-Android/Datacorn.apk

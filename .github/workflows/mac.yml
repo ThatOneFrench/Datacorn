@@ -12,18 +12,18 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install qt@5
+          arch -x86_64 brew install qt@5
           echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
 
       - name: Qmake build
         run: |
           mkdir build && cd build
-          QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" qmake -o Makefile "CONFIG+=x86_64 arm64" ../Datacorn.pro
-          make release -j3
+          arch -x86_64 /usr/bin/env QMAKE_APPLE_DEVICE_ARCHS=x86_64 qmake -o Makefile "CONFIG+=x86_64" ../Datacorn.pro
+          arch -x86_64 make release -j3
 
       - name: Bundle Qt5 frameworks into the app
         run: |
-          macdeployqt build/binary/Datacorn.app
+          arch -x86_64 macdeployqt build/binary/Datacorn.app
 
       - name: Setup directory with artifacts
         shell: bash
@@ -31,28 +31,16 @@ jobs:
           export RDIR=Datacorn
           mkdir $RDIR
           cp -R build/binary/Datacorn.app $RDIR/
-          hdiutil create -volname "Datacorn-Universal" -srcfolder $RDIR -ov -format UDZO Datacorn-universal.dmg
+          hdiutil create -volname "Datacorn-Intel" -srcfolder $RDIR -ov -format UDZO Datacorn-intel.dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Datacorn-macos-universal
+          name: Datacorn-macos-intel
           path: Datacorn/
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: Datacorn-macos-universal-dmg
-          path: Datacorn-universal.dmg
-
-      - name: Release
-        if: ${{ github.ref == 'refs/heads/master' }}
-        uses: svenstaro/upload-release-action@2.7.0
-        with:
-          overwrite: true
-          asset_name: datacorn-macos-universal.dmg
-          prerelease: true
-          tag: |
-            latest
-          file: |
-            Datacorn-universal.dmgname: macOS-build
+          name: Datacorn-macos-intel-dmg
+          path: Datacorn-intel.dmg
